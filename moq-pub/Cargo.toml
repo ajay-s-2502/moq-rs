@@ -28,7 +28,7 @@ tokio = { version = "1", features = ["full"] }
 clap = { version = "4", features = ["derive"] }
 log = { workspace = true }
 env_logger = { workspace = true }
-mp4 = "0.14"
+mp4 = { git = "https://github.com/alfg/mp4-rust"}
 anyhow = { version = "1", features = ["backtrace"] }
 serde_json = "1"
 rfc6381-codec = "0.2"
