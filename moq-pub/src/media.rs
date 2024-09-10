@@ -176,9 +176,60 @@ impl Media {
 				selection_params.codec = Some(codec_str);
 				selection_params.width = Some(width.into());
 				selection_params.height = Some(height.into());
-			} else if let Some(_hev1) = &stsd.hev1 {
-				// TODO https://github.com/gpac/mp4box.js/blob/325741b592d910297bf609bc7c400fc76101077b/src/box-codecs.js#L106
-				anyhow::bail!("HEVC not yet supported")
+			} else if let Some(hev1) = &stsd.hev1 {
+
+				let mut codec_str = String::from("hev1");
+
+				// Profile Space
+				let profile_space = match hev1.hvcc.general_profile_space {
+					0 => "",
+					1 => ".A",
+					2 => ".B",
+					3 => ".C",
+					_ => "",
+				};
+
+				codec_str.push_str(&format!("{}", profile_space));
+
+				// Profile ID
+				codec_str.push_str(&format!("{}", hev1.hvcc.general_profile_idc));
+
+				// Profile Compatibility (Reversed Binary)
+				let mut reversed = 0;
+				let mut val = hev1.hvcc.general_profile_compatibility_flags;
+				for i in 0..32 {
+					reversed |= val & 1;
+					if i == 31 {
+						break;
+					}
+					reversed <<= 1;
+					val >>= 1;
+				}
+				codec_str.push_str(&format!(".{:x}", reversed));
+
+				// Tier and Level
+				let tier = if hev1.hvcc.general_tier_flag { "H" } else { "L" };
+				codec_str.push_str(&format!(".{}{}", tier, hev1.hvcc.general_level_idc));
+
+				// Constraint Indicator
+				let mut has_byte = false;
+				let mut constraint_str = String::new();
+				for byte in hev1.hvcc.general_constraint_indicator_flag.to_be_bytes().iter().rev() {
+					if *byte != 0 || has_byte {
+						constraint_str = format!(".{:x}{}", byte, constraint_str);
+						has_byte = true;
+					}
+				}
+				codec_str.push_str(&constraint_str);
+
+				// Width and Height
+				let width = hev1.width;
+				let height = hev1.height;
+
+				selection_params.codec = Some(codec_str);
+				selection_params.width = Some(width.into());
+				selection_params.height = Some(height.into());
+
 			} else if let Some(mp4a) = &stsd.mp4a {
 				let desc = &mp4a
 					.esds

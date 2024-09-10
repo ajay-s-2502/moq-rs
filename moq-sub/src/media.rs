@@ -77,7 +77,7 @@ impl<O: AsyncWrite + Send + Unpin + 'static> Media<O> {
 			let name = format!("{}.m4s", id);
 			info!("found track {name}");
 			let mut active = false;
-			if !has_video && trak.mdia.minf.stbl.stsd.avc1.is_some() {
+			if !has_video && (trak.mdia.minf.stbl.stsd.avc1.is_some() || trak.mdia.minf.stbl.stsd.hev1.is_some()) {
 				active = true;
 				has_video = true;
 				info!("using {name} for video");
