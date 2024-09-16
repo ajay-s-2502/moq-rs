@@ -11,11 +11,11 @@ if [ ! -f dev/bbb.fmp4 ]; then
 		wget http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4 -O dev/bbb.mp4
 	fi
 
-	echo "Converting to a (properly) fragmented MP4..."
+	echo "Converting to a (properly) fragmented MP4 (HEVC)..."
 	ffmpeg -i dev/bbb.mp4 \
 		-an \
 		-c:v libx265 \
-		-f mp4 -movflags cmaf+separate_moof+delay_moov+skip_trailer+frag_keyframe \
+		-f mp4 -movflags cmaf+separate_moof+delay_moov+skip_trailer+frag_every_frame \
 		dev/bbb.fmp4
 fi
 
@@ -46,5 +46,5 @@ ffmpeg -hide_banner -v quiet \
 	-i "$INPUT" \
 	-an \
 	-c:v copy \
-	-f mp4 -movflags cmaf+separate_moof+delay_moov+skip_trailer+frag_keyframe \
+	-f mp4 -movflags cmaf+separate_moof+delay_moov+skip_trailer+frag_every_frame \
 	- | cargo run --bin moq-pub -- --name "$NAME" "$URL" "$@"
