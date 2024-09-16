@@ -4,10 +4,11 @@ x-moq: &x-moq
   build: .
   environment:
     RUST_LOG: ${RUST_LOG:-debug}
+    DISPLAY: $DISPLAY
   volumes:
-    - ./dev/localhost.crt:/etc/tls/cert:ro
-    - ./dev/localhost.key:/etc/tls/key:ro
-    - certs:/etc/ssl/certs
+    - tls_cert:/mnt/tls_cert
+    - certs:/etc/ssl/certs:ro
+    - /tmp/.X11-unix:/tmp/.X11-unix
   depends_on:
     install-certs:
       condition: service_completed_successfully
@@ -28,7 +29,7 @@ services:
   relay1:
     <<: *x-moq
     entrypoint: moq-relay
-    command: --tls-cert /etc/tls/cert --tls-key /etc/tls/key --tls-disable-verify --api http://api --node https://relay1 --dev --announce https://dir
+    command: --tls-cert /mnt/tls_cert/localhost.crt --tls-key /mnt/tls_cert/localhost.key --tls-disable-verify --api http://api --node https://relay1 --dev --announce https://dir
     depends_on:
       - api
       - dir
@@ -39,7 +40,7 @@ services:
   relay2:
     <<: *x-moq
     entrypoint: moq-relay
-    command: --tls-cert /etc/tls/cert --tls-key /etc/tls/key --tls-disable-verify --api http://api --node https://relay2 --dev --announce https://dir
+    command: --tls-cert /mnt/tls_cert/localhost.crt --tls-key /mnt/tls_cert/localhost.key --tls-disable-verify --api http://api --node https://relay2 --dev --announce https://dir
     depends_on:
       - api
       - dir
@@ -50,21 +51,32 @@ services:
   dir:
     <<: *x-moq
     entrypoint: moq-dir
-    command: --tls-cert /etc/tls/cert --tls-key /etc/tls/key
+    command: --tls-cert /mnt/tls_cert/localhost.crt --tls-key /mnt/tls_cert/localhost.key
     ports:
       - "443/udp"
+
+  pub:
+    <<: *x-moq
+    entrypoint: /usr/local/bin/pub
+    depends_on:
+      - relay1
+
+  sub:
+    <<: *x-moq
+    entrypoint: /usr/local/bin/sub
+    depends_on:
+      - pub
 
   install-certs:
     image: golang:latest
     working_dir: /work
-    command: go run filippo.io/mkcert -install
-    environment:
-      CAROOT: /work/caroot
+    command: sh -c "go run filippo.io/mkcert -ecdsa -install && go run filippo.io/mkcert -ecdsa -days 10 -cert-file localhost.crt -key-file localhost.key localhost 127.0.0.1 ::1 relay1 relay2"
     volumes:
-      - ${CAROOT:-.}:/work/caroot
+      - tls_cert:/work
       - certs:/etc/ssl/certs
       - ./dev/go.mod:/work/go.mod:ro
       - ./dev/go.sum:/work/go.sum:ro
 
 volumes:
   certs:
+  tls_cert:
