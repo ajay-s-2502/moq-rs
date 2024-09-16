@@ -33,13 +33,16 @@ CMD [ "publish" ]
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
-	apt-get install -y --no-install-recommends ca-certificates curl libssl3 && \
+	apt-get install -y --no-install-recommends ca-certificates curl libssl3 ffmpeg wget && \
 	rm -rf /var/lib/apt/lists/*
 
 LABEL org.opencontainers.image.source=https://github.com/kixelated/moq-rs
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
 COPY --from=builder /usr/local/cargo/bin/moq-* /usr/local/bin
+COPY ./dev/bbb.fmp4 /tmp/bbb.fmp4
+COPY ./dev/pub /usr/local/bin/pub
+COPY ./dev/sub /usr/local/bin/sub
 
 # Entrypoint to load relay TLS config in Fly
 # TODO remove this; it should be specific to the fly deployment.
