@@ -13,21 +13,21 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/build/target \
     cargo build --release && cp /build/target/release/moq-* /usr/local/cargo/bin
 
-# Create a pub image that also contains ffmpeg and a helper script
-FROM debian:bookworm-slim as moq-pub
+# # Create a pub image that also contains ffmpeg and a helper script
+# FROM debian:bookworm-slim as moq-pub
 
-# Install required utilities and ffmpeg
-RUN apt-get update && \
-    apt-get install -y ffmpeg wget
+# # Install required utilities and ffmpeg
+# RUN apt-get update && \
+#     apt-get install -y ffmpeg wget
 
-# Copy the publish script into the image
-COPY ./deploy/publish /usr/local/bin/publish
+# # Copy the publish script into the image
+# COPY ./deploy/publish /usr/local/bin/publish
 
-# Copy over the built binaries.
-COPY --from=builder /usr/local/cargo/bin/moq-* /usr/local/bin
+# # Copy over the built binaries.
+# COPY --from=builder /usr/local/cargo/bin/moq-* /usr/local/bin
 
-# Use our publish script
-CMD [ "publish" ]
+# # Use our publish script
+# CMD [ "publish" ]
 
 # Create an image with just the binaries
 FROM debian:bookworm-slim
@@ -40,13 +40,15 @@ LABEL org.opencontainers.image.source=https://github.com/kixelated/moq-rs
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
 COPY --from=builder /usr/local/cargo/bin/moq-* /usr/local/bin
-COPY ./dev/bbb.fmp4 /tmp/bbb.fmp4
-COPY ./dev/pub /usr/local/bin/pub
-COPY ./dev/sub /usr/local/bin/sub
+
+RUN wget https://moq-tls-cert.s3.ap-south-1.amazonaws.com/relay-server.crt -O /tmp/relay-server.crt
+RUN wget https://moq-tls-cert.s3.ap-south-1.amazonaws.com/relay-server.key -O /tmp/relay-server.key
+RUN wget https://moq-tls-cert.s3.ap-south-1.amazonaws.com/rootCA.pem -O /usr/local/share/ca-certificates/rootCA.crt
+RUN update-ca-certificates
 
 # Entrypoint to load relay TLS config in Fly
 # TODO remove this; it should be specific to the fly deployment.
-COPY deploy/fly-relay.sh .
+# COPY deploy/fly-relay.sh .
 
 # Default to moq-relay
-CMD ["moq-relay"]
+# CMD ["moq-relay"]
