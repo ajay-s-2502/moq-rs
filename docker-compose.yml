@@ -1,35 +1,27 @@
-version: "3.8"
-
-x-moq: &x-moq
-  build: .
-  environment:
-    RUST_LOG: ${RUST_LOG:-debug}
-    DISPLAY: $DISPLAY
-  volumes:
-    - tls_cert:/mnt/tls_cert
-    - certs:/etc/ssl/certs:ro
-    - /tmp/.X11-unix:/tmp/.X11-unix
-  depends_on:
-    install-certs:
-      condition: service_completed_successfully
-
 services:
   redis:
     image: redis:7
+    container_name: moq-redis
     ports:
       - "6379"
 
   api:
-    <<: *x-moq
+    build: .
+    container_name: moq-api
+    environment:
+      RUST_LOG: ${RUST_LOG:-debug}
     entrypoint: moq-api
     command: --redis redis://redis:6379
     ports:
       - "80"
 
-  relay1:
-    <<: *x-moq
+  relay:
+    build: .
+    container_name: moq-relay
+    environment:
+      RUST_LOG: ${RUST_LOG:-debug}
     entrypoint: moq-relay
-    command: --tls-cert /mnt/tls_cert/localhost.crt --tls-key /mnt/tls_cert/localhost.key --tls-disable-verify --api http://api --node https://relay1 --dev --announce https://dir
+    command: --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key --tls-disable-verify --api http://api --node https://relay --dev --announce https://dir
     depends_on:
       - api
       - dir
@@ -37,46 +29,39 @@ services:
       - "4443:443"
       - "4443:443/udp"
 
-  relay2:
-    <<: *x-moq
-    entrypoint: moq-relay
-    command: --tls-cert /mnt/tls_cert/localhost.crt --tls-key /mnt/tls_cert/localhost.key --tls-disable-verify --api http://api --node https://relay2 --dev --announce https://dir
-    depends_on:
-      - api
-      - dir
-    ports:
-      - "4444:443"
-      - "4444:443/udp"
-
   dir:
-    <<: *x-moq
+    build: .
+    container_name: moq-dir
+    environment:
+      RUST_LOG: ${RUST_LOG:-debug}
     entrypoint: moq-dir
-    command: --tls-cert /mnt/tls_cert/localhost.crt --tls-key /mnt/tls_cert/localhost.key
+    command: --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key
     ports:
       - "443/udp"
 
   pub:
-    <<: *x-moq
-    entrypoint: /usr/local/bin/pub
+    build: .
+    container_name: moq-pub
+    environment:
+      RUST_LOG: ${RUST_LOG:-debug}
+      HOST: relay
+      PORT: 443
+      ADDR: relay:443
+      SCHEME: https
+      NAME: bbb
+      URL: https://relay:443
     depends_on:
-      - relay1
+      - relay
 
   sub:
-    <<: *x-moq
-    entrypoint: /usr/local/bin/sub
+    build: .
+    container_name: moq-sub
+    environment:
+      RUST_LOG: ${RUST_LOG:-debug}
+      HOST: relay
+      PORT: 443
+      ADDR: relay:443
+      NAME: bbb
+      URL: https://relay:443/bbb
     depends_on:
       - pub
-
-  install-certs:
-    image: golang:latest
-    working_dir: /work
-    command: sh -c "go run filippo.io/mkcert -ecdsa -install && go run filippo.io/mkcert -ecdsa -days 10 -cert-file localhost.crt -key-file localhost.key localhost 127.0.0.1 ::1 relay1 relay2"
-    volumes:
-      - tls_cert:/work
-      - certs:/etc/ssl/certs
-      - ./dev/go.mod:/work/go.mod:ro
-      - ./dev/go.sum:/work/go.sum:ro
-
-volumes:
-  certs:
-  tls_cert:
