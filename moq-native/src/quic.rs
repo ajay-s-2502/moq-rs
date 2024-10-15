@@ -202,11 +202,20 @@ impl Client {
 		let port = url.port().unwrap_or(443);
 
 		// Look up the DNS entry.
-		let addr = tokio::net::lookup_host((host.clone(), port))
-			.await
-			.context("failed DNS lookup")?
-			.next()
-			.context("no DNS entries")?;
+		let addr = loop {
+            match tokio::net::lookup_host((host.clone(), port)).await {
+                Ok(mut addr_iter) => {
+                    if let Some(addr) = addr_iter.next() {
+                        break addr;  // Successful DNS lookup
+                    } else {
+                        eprintln!("No DNS entries found for {}, retrying...", host);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("DNS lookup failed for {}: {:?}, retrying...", host, e);
+                }
+            }
+        };
 
 		let connection = self.quic.connect_with(config, addr, &host)?.await?;
 
