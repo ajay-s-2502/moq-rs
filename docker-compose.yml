@@ -1,4 +1,54 @@
 services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+    - 9090:9090
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+    - cadvisor
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+    cpuset: "3"
+  
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+    - 8080:8080
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+    cpuset: "4"
+    # depends_on:
+    # - redis
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=0000
+    # depends_on:
+    #   - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+    cpuset: "5"
+
   redis:
     image: redis:7
     container_name: moq-redis
@@ -18,13 +68,20 @@ services:
   relay:
     build: .
     container_name: moq-relay
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+    cpuset: "0"
     environment:
       RUST_LOG: ${RUST_LOG:-debug}
     entrypoint: moq-relay
-    command: --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key --tls-disable-verify --api http://api --node https://relay --dev --announce https://dir
-    depends_on:
-      - api
-      - dir
+    # command: --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key --tls-disable-verify --api http://api --node https://relay --dev --announce https://dir
+    command: --bind [::]:443 --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key --tls-disable-verify
+    # depends_on:
+    #   - api
+    #   - dir
     ports:
       - "4443:443"
       - "4443:443/udp"
@@ -42,6 +99,12 @@ services:
   pub:
     build: .
     container_name: moq-pub
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+    cpuset: "1"
     environment:
       RUST_LOG: ${RUST_LOG:-debug}
       HOST: relay
@@ -49,19 +112,21 @@ services:
       ADDR: relay:443
       SCHEME: https
       NAME: bbb
-      URL: https://relay:443
-    depends_on:
-      - relay
+      URL: https://192.168.14.33:4443
 
   sub:
     build: .
     container_name: moq-sub
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+    cpuset: "2"
     environment:
       RUST_LOG: ${RUST_LOG:-debug}
       HOST: relay
       PORT: 443
       ADDR: relay:443
       NAME: bbb
-      URL: https://relay:443/bbb
-    depends_on:
-      - pub
+      URL: https://192.168.14.33:4443/bbb
