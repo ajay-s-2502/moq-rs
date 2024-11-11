@@ -2,3 +2,5 @@
 target/
 logs/
 *.mp4
+*logs.txt
+latency_test_history.txt
