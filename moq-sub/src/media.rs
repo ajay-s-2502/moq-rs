@@ -33,74 +33,105 @@ impl<O: AsyncWrite + Send + Unpin + 'static> Media<O> {
 	}
 
 	pub async fn run(&mut self) -> anyhow::Result<()> {
-		let moov = {
-			let init_track_name = "0.mp4";
-			let track = self
-				.tracks_writer
-				.create(init_track_name)
-				.context("failed to create init track")?;
-
-			let mut subscriber = self.subscriber.clone();
-			tokio::task::spawn(async move {
-				subscriber.subscribe(track).await.unwrap_or_else(|err| {
-					warn!("failed to subscribe to init track: {err:?}");
-				});
+		// Define the maximum number of retries
+		let max_retries = 100;
+		let mut retries = 0;
+	
+		loop {
+			let result = self.try_run().await;
+	
+			match result {
+				Ok(()) => return Ok(()), // If successful, exit the loop and return Ok
+				Err(err) => {
+					// If there's an error, increment retries and check if we've reached max retries
+					retries += 1;
+					if retries >= max_retries {
+						warn!("Maximum retries reached, giving up.");
+						return Err(err); // Return the last error encountered
+					}
+	
+					// Log the error and retry after a brief delay
+					warn!("Error occurred, retrying ({retries}/{max_retries}): {err:?}");
+					tokio::time::sleep(std::time::Duration::from_secs(1)).await; // Delay before retrying
+				}
+			}
+		}
+	}
+	
+	async fn try_run(&mut self) -> anyhow::Result<()> {
+		let init_track_name = "0.mp4";
+		let track = self
+			.tracks_writer
+			.create(init_track_name)
+			.context("failed to create init track")?;
+	
+		let mut subscriber = self.subscriber.clone();
+		tokio::task::spawn(async move {
+			subscriber.subscribe(track).await.unwrap_or_else(|err| {
+				warn!("failed to subscribe to init track: {err:?}");
 			});
-
-			let track = self.broadcast.subscribe(init_track_name).context("no init track")?;
-			let mut group = match track.mode().await? {
-				TrackReaderMode::Groups(mut groups) => groups.next().await?.context("no init group")?,
-				_ => anyhow::bail!("expected init segment"),
-			};
-
-			let object = group.next().await?.context("no init fragment")?;
-			let buf = Self::recv_object(object).await?;
-			self.output.lock().await.write_all(&buf).await?;
-			let mut reader = Cursor::new(&buf);
-
-			let ftyp = read_atom(&mut reader).await?;
-			anyhow::ensure!(&ftyp[4..8] == b"ftyp", "expected ftyp atom");
-
-			let moov = read_atom(&mut reader).await?;
-			anyhow::ensure!(&moov[4..8] == b"moov", "expected moov atom");
-			let mut moov_reader = Cursor::new(&moov);
-			let moov_header = mp4::BoxHeader::read(&mut moov_reader)?;
-
-			mp4::MoovBox::read_box(&mut moov_reader, moov_header.size)?
+		});
+	
+		let track = self.broadcast.subscribe(init_track_name).context("no init track")?;
+		let mut group = match track.mode().await? {
+			TrackReaderMode::Groups(mut groups) => groups.next().await?.context("no init group")?,
+			_ => anyhow::bail!("expected init segment"),
 		};
-
+	
+		let object = group.next().await?.context("no init fragment")?;
+		let buf = Self::recv_object(object).await?;
+		self.output.lock().await.write_all(&buf).await?;
+		let mut reader = Cursor::new(&buf);
+	
+		let ftyp = read_atom(&mut reader).await?;
+		anyhow::ensure!(&ftyp[4..8] == b"ftyp", "expected ftyp atom");
+	
+		let moov = read_atom(&mut reader).await?;
+		anyhow::ensure!(&moov[4..8] == b"moov", "expected moov atom");
+		let mut moov_reader = Cursor::new(&moov);
+		let moov_header = mp4::BoxHeader::read(&mut moov_reader)?;
+	
+		let moov_box = mp4::MoovBox::read_box(&mut moov_reader, moov_header.size)?;
+	
 		let mut has_video = false;
 		let mut has_audio = false;
 		let mut tracks = vec![];
-		for trak in &moov.traks {
+	
+		for trak in &moov_box.traks {
 			let id = trak.tkhd.track_id;
 			let name = format!("{}.m4s", id);
 			info!("found track {name}");
 			let mut active = false;
+	
+			// Handle video track
 			if !has_video && (trak.mdia.minf.stbl.stsd.avc1.is_some() || trak.mdia.minf.stbl.stsd.hev1.is_some()) {
 				active = true;
 				has_video = true;
 				info!("using {name} for video");
 			}
+	
+			// Handle audio track
 			if !has_audio && trak.mdia.minf.stbl.stsd.mp4a.is_some() {
 				active = true;
 				has_audio = true;
 				info!("using {name} for audio");
 			}
+	
+			// Create track if active (either audio or video)
 			if active {
 				let track = self.tracks_writer.create(&name).context("failed to create track")?;
-
+	
 				let mut subscriber = self.subscriber.clone();
 				tokio::task::spawn(async move {
 					subscriber.subscribe(track).await.unwrap_or_else(|err| {
 						warn!("failed to subscribe to track: {err:?}");
 					});
 				});
-
+	
 				tracks.push(self.broadcast.subscribe(&name).context("no track")?);
 			}
 		}
-
+	
 		info!("playing {} tracks", tracks.len());
 		let mut tasks = JoinSet::new();
 		for track in tracks {
@@ -112,9 +143,13 @@ impl<O: AsyncWrite + Send + Unpin + 'static> Media<O> {
 				}
 			});
 		}
+	
+		// Wait for all tasks to complete
 		while tasks.join_next().await.is_some() {}
+	
 		Ok(())
 	}
+	
 
 	async fn recv_track(track: TrackReader, out: Arc<Mutex<O>>) -> anyhow::Result<()> {
 		let name = track.name.clone();
