@@ -59,7 +59,7 @@ services:
     build: .
     container_name: moq-api
     environment:
-      RUST_LOG: ${RUST_LOG:-debug}
+      RUST_LOG: ${RUST_LOG:-trace}
     entrypoint: moq-api
     command: --redis redis://redis:6379
     ports:
@@ -75,7 +75,7 @@ services:
           memory: 1g
     cpuset: "0"
     environment:
-      RUST_LOG: ${RUST_LOG:-debug}
+      RUST_LOG: ${RUST_LOG:-trace}
     entrypoint: moq-relay
     # command: --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key --tls-disable-verify --api http://api --node https://relay --dev --announce https://dir
     command: --bind [::]:443 --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key --tls-disable-verify
@@ -90,7 +90,7 @@ services:
     build: .
     container_name: moq-dir
     environment:
-      RUST_LOG: ${RUST_LOG:-debug}
+      RUST_LOG: ${RUST_LOG:-trace}
     entrypoint: moq-dir
     command: --tls-cert /tmp/relay-server.crt --tls-key /tmp/relay-server.key
     ports:
@@ -106,7 +106,7 @@ services:
           memory: 1g
     cpuset: "1"
     environment:
-      RUST_LOG: ${RUST_LOG:-debug}
+      RUST_LOG: ${RUST_LOG:-trace}
       HOST: relay
       PORT: 443
       ADDR: relay:443
@@ -124,7 +124,7 @@ services:
           memory: 1g
     cpuset: "2"
     environment:
-      RUST_LOG: ${RUST_LOG:-debug}
+      RUST_LOG: ${RUST_LOG:-trace}
       HOST: relay
       PORT: 443
       ADDR: relay:443
