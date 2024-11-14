@@ -1,5 +1,8 @@
 use clap::Parser;
 
+use env_logger::{Builder, fmt::TimestampPrecision};
+use std::env;
+
 mod api;
 mod consumer;
 mod local;
@@ -20,6 +23,13 @@ pub use web::*;
 
 use std::net;
 use url::Url;
+
+fn init_logger() {
+    let mut builder = Builder::from_default_env();
+    builder
+        .format_timestamp(Some(TimestampPrecision::Micros))
+        .init();
+}
 
 #[derive(Parser, Clone)]
 pub struct Cli {
@@ -54,7 +64,7 @@ pub struct Cli {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	env_logger::init();
+	init_logger();
 
 	// Disable tracing so we don't get a bunch of Quinn spam.
 	let tracer = tracing_subscriber::FmtSubscriber::builder()

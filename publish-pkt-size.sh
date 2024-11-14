@@ -31,10 +31,8 @@ ffmpeg -stream_loop -1 -re -i "$VIDEO_FILE" \
   -an -c:v libx265 -preset ultrafast -tune zerolatency -f mp4 \
   -movflags cmaf+separate_moof+delay_moov+skip_trailer+frag_every_frame - | \
   docker compose run -T pub moq-pub --name bbb https://relay:443 2> >( \
-  grep --line-buffered -o -E "size: [0-9]+" | \
+  grep --line-buffered -o -E "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z.*size: [0-9]+" | \
   while read -r line; do
-      size=$(echo "$line" | awk '{print $2}')
-      current_time=$(date '+%Y-%m-%d %H:%M:%S.%3N')
-      echo "$current_time packet size: $size" >> "$PACKET_SIZE_LOG"
+      echo "$line" >> "$PACKET_SIZE_LOG"
   done)
 

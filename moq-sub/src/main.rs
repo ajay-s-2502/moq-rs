@@ -4,13 +4,23 @@ use anyhow::Context;
 use clap::Parser;
 use url::Url;
 
+use env_logger::{Builder, fmt::TimestampPrecision};
+use std::env;
+
 use moq_native::quic;
 use moq_sub::media::Media;
 use moq_transport::serve::Tracks;
 
+fn init_logger() {
+    let mut builder = Builder::from_default_env();
+    builder
+        .format_timestamp(Some(TimestampPrecision::Micros))
+        .init();
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	env_logger::init();
+	init_logger();
 
 	// Disable tracing so we don't get a bunch of Quinn spam.
 	let tracer = tracing_subscriber::FmtSubscriber::builder()

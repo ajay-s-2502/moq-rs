@@ -25,12 +25,7 @@ fi
 
 # Run the subscriber and capture timestamps
 docker compose run sub moq-sub --name bbb https://relay:443/bbb > out.mp4 2> >( \
-grep --line-buffered -o -E "size: [0-9]+" | \
+grep --line-buffered -o -E "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z.*size: [0-9]+" | \
 while read -r line; do
-    # Extract the packet size
-    size=$(echo "$line" | awk '{print $2}')
-    # Get the current timestamp
-    current_time=$(date '+%Y-%m-%d %H:%M:%S.%3N')
-    # Write the timestamped packet size to a log file
-    echo "$current_time packet size: $size" >> "$PACKET_SIZE_LOG"
+    echo "$line" >> "$PACKET_SIZE_LOG"
 done)
