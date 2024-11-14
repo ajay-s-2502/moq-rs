@@ -7,7 +7,6 @@ use std::net;
 use moq_native::{quic, tls};
 
 use env_logger::{Builder, fmt::TimestampPrecision};
-use std::env;
 
 mod listing;
 mod listings;

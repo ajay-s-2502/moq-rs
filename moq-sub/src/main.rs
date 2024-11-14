@@ -5,7 +5,6 @@ use clap::Parser;
 use url::Url;
 
 use env_logger::{Builder, fmt::TimestampPrecision};
-use std::env;
 
 use moq_native::quic;
 use moq_sub::media::Media;

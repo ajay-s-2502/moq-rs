@@ -4,7 +4,6 @@ mod server;
 use moq_api::ApiError;
 use server::{Server, ServerConfig};
 use env_logger::{Builder, fmt::TimestampPrecision};
-use std::env;
 
 fn init_logger() {
     let mut builder = Builder::from_default_env();

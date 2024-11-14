@@ -1,7 +1,6 @@
 use clap::Parser;
 
 use env_logger::{Builder, fmt::TimestampPrecision};
-use std::env;
 
 mod api;
 mod consumer;
