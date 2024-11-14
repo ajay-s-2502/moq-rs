@@ -55,13 +55,18 @@ def calculate_latency(pub_log_file, sub_log_file):
     
     # Output the latency results
     if latencies:
-        avg_latency = sum(latencies) / len(latencies)
-        
-        for latency in latencies:
-            if latency < 0:
-                print("negative latency found")
-
+        print(sum(latencies))
         print(len(latencies))
+        error_count = 0
+        for i in range(0, len(latencies)):
+            if latencies[i] < 0:
+                latencies[i] = 0
+                error_count += 1
+
+        avg_latency = sum(latencies) / (len(latencies) - error_count)
+
+        print(sum(latencies))
+        print(len(latencies)-error_count)
         print(f"Average latency: {avg_latency*1000:.3f} ms")
     else:
         print("No matching packets found.")

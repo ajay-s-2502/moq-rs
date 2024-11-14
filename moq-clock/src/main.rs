@@ -3,7 +3,6 @@ use std::net;
 use url::Url;
 
 use env_logger::{Builder, fmt::TimestampPrecision};
-use std::env;
 
 use anyhow::Context;
 use clap::Parser;
